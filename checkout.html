@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stripe Checkout Test</title>
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+  <h1>Test Stripe Payment</h1>
+  <button id="payBtn">Zaplať 10€</button>
+
+  <script>
+    const stripe = Stripe("pk_test_TVOJ_PUBLIC_KEY");
+
+    document.getElementById("payBtn").addEventListener("click", async () => {
+      const res = await fetch("/create-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1000, currency: "eur" })
+      });
+
+      const data = await res.json();
+      const { clientSecret } = data;
+
+      const result = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: {
+            number: "4242424242424242",
+            exp_month: 12,
+            exp_year: 2025,
+            cvc: "123"
+          }
+        }
+      });
+
+      if (result.error) {
+        alert("Chyba: " + result.error.message);
+      } else {
+        alert("Platba úspešná!");
+      }
+    });
+  </script>
+</body>
+</html>
