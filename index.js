@@ -1,19 +1,23 @@
 const express = require("express");
-const Stripe = require("stripe");
 const bodyParser = require("body-parser");
 
 const app = express();
 app.use(bodyParser.json());
 
-const stripe = Stripe("sk_test_51RvEnt9aViwz7NDmDhMFrE8Z7GyV7yRj41b2gaXWli3Rbt2jKl9vX5E9IP7i2RxYVwYaF74Tdq8uyG5a7FAan3DJ006Z0FthX6");
+// sprístupni statické súbory (napr. checkout.html) z koreňového priečinka
+app.use(express.static(__dirname));
 
+// Stripe kľúč ber z prostredia (NEukladať do kódu!)
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+// endpoint na vytvorenie Payment Intentu
 app.post("/create-payment-intent", async (req, res) => {
   try {
     const { amount, currency } = req.body;
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount,
-      currency: currency,
+      amount,
+      currency,
     });
 
     res.json({ clientSecret: paymentIntent.client_secret });
@@ -22,4 +26,6 @@ app.post("/create-payment-intent", async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log("Server beží na porte 3000"));
+// Render ti dá port cez env; lokálne padne na 3000
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server beží na porte ${PORT}`));
