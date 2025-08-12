@@ -5,67 +5,81 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stripe Checkout – test</title>
   <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    .row { margin: 12px 0; }
+    #card-element { padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+    #payBtn { padding: 10px 16px; border: 0; border-radius: 8px; background:#635bff; color:#fff; cursor:pointer; }
+    #payBtn[disabled] { opacity:.6; cursor: not-allowed; }
+    #log { background:#f7f7f7; padding:12px; white-space:pre-wrap; border-radius:8px; }
+  </style>
 </head>
 <body>
   <h1>Test Stripe platba</h1>
 
-  <p>
-    Suma: <strong>10,00 €</strong> (na server pošleme 1000 centov)<br />
-    Mena: <strong>EUR</strong>
-  </p>
+  <div class="row">Suma: <strong>10,00 €</strong> (posielame 1000 centov)</div>
+  <div class="row">Mena: <strong>EUR</strong></div>
 
-  <button id="payBtn">Zaplať 10 €</button>
+  <div class="row" id="card-element"></div>
 
-  <pre id="log" style="background:#f7f7f7;padding:12px;margin-top:12px;"></pre>
+  <div class="row">
+    <button id="payBtn">Zaplať 10 €</button>
+  </div>
+
+  <pre id="log"></pre>
 
   <script>
-    const log = (m) => {
-      document.getElementById('log').textContent += m + '\n';
-    };
+    const $ = (id) => document.getElementById(id);
+    const log = (m) => { $('log').textContent += m + '\n'; };
 
     async function init() {
       // 1) Získaj publishable key zo servera
-      const cfg = await fetch('/config').then(r => r.json());
+      const cfg = await fetch('/config').then(r => r.json()).catch(() => ({}));
       if (!cfg.publishableKey) {
-        log('⚠️ Chýba PUBLISHABLE KEY – nastav ho ako ENV premennú.');
+        log('⚠️ Chýba PUBLISHABLE KEY – nastav na serveri ENV STRIPE_PUBLISHABLE_KEY.');
         return;
       }
       const stripe = Stripe(cfg.publishableKey);
 
-      document.getElementById('payBtn').addEventListener('click', async () => {
+      // 2) Vytvor Elements a Card Element
+      const elements = stripe.elements();
+      const card = elements.create('card', { hidePostalCode: true });
+      card.mount('#card-element');
+
+      $('payBtn').addEventListener('click', pay);
+
+      async function pay() {
+        $('payBtn').disabled = true;
+        $('log').textContent = '';
+
         try {
-          // 2) Vytvor payment intent u nás na serveri
+          // 3) Vytvor Payment Intent na serveri
           const res = await fetch('/create-payment-intent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: 1000, currency: 'eur' }) // 10 € v centoch
+            body: JSON.stringify({ amount: 1000, currency: 'eur' })
           });
           const data = await res.json();
           if (!data.clientSecret) throw new Error(data.error || 'Žiadny clientSecret');
 
-          // 3) Test platba bez Elements (iba v sandboxe) – použijeme test kartu
+          // 4) Potvrď platbu s Card Elementom
           const result = await stripe.confirmCardPayment(data.clientSecret, {
-            payment_method: {
-              card: {
-                number: '4242424242424242',
-                exp_month: 12,
-                exp_year: 2025,
-                cvc: '123'
-              }
-            }
+            payment_method: { card }
           });
 
           if (result.error) {
             log('❌ Platba zlyhala: ' + result.error.message);
-          } else if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+          } else if (result.paymentIntent?.status === 'succeeded') {
             log('✅ Platba prebehla úspešne!');
           } else {
             log('ℹ️ Stav platby: ' + (result.paymentIntent?.status || 'neznámy'));
           }
         } catch (e) {
           log('❌ Chyba: ' + e.message);
+        } finally {
+          $('payBtn').disabled = false;
         }
-      });
+      }
     }
 
     init();
