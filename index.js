@@ -1,15 +1,13 @@
-require('dotenv').config();
-const express = require('express');
-const bodyParser = require('body-parser');
-const Stripe = require('stripe');
+const express = require("express");
+const Stripe = require("stripe");
+const bodyParser = require("body-parser");
 
 const app = express();
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-
 app.use(bodyParser.json());
 
-// Endpoint na vytvorenie platby
-app.post('/create-payment-intent', async (req, res) => {
+const stripe = Stripe("sk_test_51RvEnt9aViwz7NDmDhMFrE8Z7GyV7yRj41b2gaXWli3Rbt2jKl9vX5E9IP7i2RxYVwYaF74Tdq8uyG5a7FAan3DJ006Z0FthX6");
+
+app.post("/create-payment-intent", async (req, res) => {
   try {
     const { amount, currency } = req.body;
 
@@ -18,15 +16,10 @@ app.post('/create-payment-intent', async (req, res) => {
       currency: currency,
     });
 
-    res.send({
-      clientSecret: paymentIntent.client_secret,
-    });
+    res.json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
-app.listen(3000, () => {
-  console.log('Server beží na porte 3000');
-});
-
+app.listen(3000, () => console.log("Server beží na porte 3000"));
