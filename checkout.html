@@ -1,45 +1,75 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="sk">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stripe Checkout Test</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stripe Checkout – test</title>
   <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
-  <h1>Test Stripe Payment</h1>
-  <button id="payBtn">Zaplať 10€</button>
+  <h1>Test Stripe platba</h1>
+
+  <p>
+    Suma: <strong>10,00 €</strong> (na server pošleme 1000 centov)<br />
+    Mena: <strong>EUR</strong>
+  </p>
+
+  <button id="payBtn">Zaplať 10 €</button>
+
+  <pre id="log" style="background:#f7f7f7;padding:12px;margin-top:12px;"></pre>
 
   <script>
-    const stripe = Stripe("pk_test_TVOJ_PUBLIC_KEY");
+    const log = (m) => {
+      document.getElementById('log').textContent += m + '\n';
+    };
 
-    document.getElementById("payBtn").addEventListener("click", async () => {
-      const res = await fetch("/create-payment-intent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 1000, currency: "eur" })
-      });
+    async function init() {
+      // 1) Získaj publishable key zo servera
+      const cfg = await fetch('/config').then(r => r.json());
+      if (!cfg.publishableKey) {
+        log('⚠️ Chýba PUBLISHABLE KEY – nastav ho ako ENV premennú.');
+        return;
+      }
+      const stripe = Stripe(cfg.publishableKey);
 
-      const data = await res.json();
-      const { clientSecret } = data;
+      document.getElementById('payBtn').addEventListener('click', async () => {
+        try {
+          // 2) Vytvor payment intent u nás na serveri
+          const res = await fetch('/create-payment-intent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: 1000, currency: 'eur' }) // 10 € v centoch
+          });
+          const data = await res.json();
+          if (!data.clientSecret) throw new Error(data.error || 'Žiadny clientSecret');
 
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: {
-            number: "4242424242424242",
-            exp_month: 12,
-            exp_year: 2025,
-            cvc: "123"
+          // 3) Test platba bez Elements (iba v sandboxe) – použijeme test kartu
+          const result = await stripe.confirmCardPayment(data.clientSecret, {
+            payment_method: {
+              card: {
+                number: '4242424242424242',
+                exp_month: 12,
+                exp_year: 2025,
+                cvc: '123'
+              }
+            }
+          });
+
+          if (result.error) {
+            log('❌ Platba zlyhala: ' + result.error.message);
+          } else if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+            log('✅ Platba prebehla úspešne!');
+          } else {
+            log('ℹ️ Stav platby: ' + (result.paymentIntent?.status || 'neznámy'));
           }
+        } catch (e) {
+          log('❌ Chyba: ' + e.message);
         }
       });
+    }
 
-      if (result.error) {
-        alert("Chyba: " + result.error.message);
-      } else {
-        alert("Platba úspešná!");
-      }
-    });
+    init();
   </script>
 </body>
 </html>
+
