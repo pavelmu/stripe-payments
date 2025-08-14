@@ -8,6 +8,11 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname))); // sprístupni checkout.html z koreňa
 
+// === Root route pre Render ===
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'checkout.html'));
+});
+
 // ===== Stripe cez ENV, nie v kóde! =====
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 if (!stripeSecret) {
@@ -33,7 +38,6 @@ app.post('/create-payment-intent', async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency,
-      // pohodlná voľba – Stripe si vyberie vhodný spôsob platby
       automatic_payment_methods: { enabled: true },
     });
 
